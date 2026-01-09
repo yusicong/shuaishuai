@@ -1,0 +1,18 @@
+# 填写您的模型与服务配置，留空表示稍后再填写
+provider: "dashscope"  # 可选：openai / dashscope（默认使用 Qwen 的 dashscope）
+
+openai:
+  api_key: ""
+  model: ""
+  temperature: 0.2
+
+dashscope:
+  api_key: "sk-ef482cecbe9b422da860a7943f48d635"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"  # 例如：https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+  model: "qwen3-max"      # 例如：qwen-plus、qwen-max、qwen-flash 等
+  temperature: 0.2
+
+langfuse:
+  secret_key: "sk-lf-7ef89dfd-b3ab-4516-b94f-504cd967392c"
+  public_key: "pk-lf-12fb741f-4d30-403c-9e34-37eac6c0fe86"
+  host: "http://localhost:3000"
