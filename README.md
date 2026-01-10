@@ -12,7 +12,8 @@ lang-all/
 │   └── settings.yaml       # (可选) 项目配置，如模型名称、API参数等
 ├── data/                   # 存放数据文件
 │   ├── raw/                # 原始数据
-│   └── processed/          # 处理后的数据
+│   ├── processed/          # 处理后的数据
+│   └── vector_db/          # 向量数据库持久化目录
 ├── docs/                   # 项目文档
 ├── notebooks/              # Jupyter Notebooks，用于实验和演示
 │   ├── 01_langchain_basics.ipynb
@@ -20,7 +21,8 @@ lang-all/
 ├── src/                    # 源代码目录
 │   ├── __init__.py
 │   ├── core/               # 核心逻辑
-│   │   └── config.py       # 配置加载逻辑
+│   │   ├── config.py       # 配置加载逻辑
+│   │   └── vector_store.py # 向量数据库服务
 │   ├── chains/             # LangChain 链的定义
 │   │   └── __init__.py
 │   ├── graphs/             # LangGraph 图的定义
@@ -28,7 +30,8 @@ lang-all/
 │   ├── tools/              # 自定义工具 (Tools)
 │   │   └── __init__.py
 │   └── utils/              # 通用工具函数
-│       └── __init__.py
+│       ├── __init__.py
+│       └── vector_utils.py # 向量数据库工具类
 ├── tests/                  # 测试代码
 │   ├── __init__.py
 │   └── test_main.py
@@ -54,3 +57,37 @@ lang-all/
 - **tests/**: 编写测试用例，确保代码的正确性。
 - **.env**: 存放敏感信息，如 `OPENAI_API_KEY`。
 - **requirements.txt**: 记录项目安装的 Python 包。
+
+## 向量数据库 (ChromaDB)
+
+本项目集成了 ChromaDB 作为向量数据库，用于检索增强生成 (RAG) 等场景。
+
+### 初始化
+
+在应用启动时，需要调用 `init_chroma_service()` 来初始化向量数据库服务：
+
+```python
+from src.core.vector_store import init_chroma_service
+
+# 初始化向量数据库服务
+init_chroma_service(persist_directory="./data/vector_db", embedding_model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+```
+
+### 使用工具类
+
+项目提供了便捷的工具类 `VectorDBUtil` 来操作向量数据库：
+
+```python
+from src.utils.vector_utils import VectorDBUtil, add_texts, similarity_search
+
+# 方法一：使用工具类实例
+util = VectorDBUtil(collection_name="my_docs")
+doc_ids = util.add_texts(["文档1内容", "文档2内容"], [{"source": "file1"}, {"source": "file2"}])
+results = util.similarity_search("查询文本", k=2)
+
+# 方法二：使用便捷函数
+doc_ids = add_texts(["文档1内容", "文档2内容"], [{"source": "file1"}, {"source": "file2"}], collection_name="my_docs")
+results = similarity_search("查询文本", k=2, collection_name="my_docs")
+```
+
+向量数据库会自动在 `./data/vector_db` 目录下进行持久化存储。
