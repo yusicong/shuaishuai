@@ -153,7 +153,7 @@ def process_tool_calls(
     
     for iteration in range(max_iterations):
         # 调用链获取响应
-        logger.debug(f"Iteration {iteration + 1}: Invoking LLM...")
+        logger.debug(f"Iteration {iteration + 1}: Invoking LLM (streaming)...")
         
         # 详细记录输入消息
         if logger.level("DEBUG"):
@@ -161,10 +161,23 @@ def process_tool_calls(
                 content_preview = str(msg.content)[:100] + "..." if len(str(msg.content)) > 100 else str(msg.content)
                 logger.debug(f"Chain Input Msg[{i}] ({type(msg).__name__}): {content_preview}")
 
-        response: AIMessage = chain.invoke(
+        # 使用 chain.stream 替代 chain.invoke
+        final_chunk = None
+        for chunk in chain.stream(
             {"messages": messages},
             config=config
-        )
+        ):
+            if final_chunk is None:
+                final_chunk = chunk
+            else:
+                final_chunk += chunk
+            
+            # 如果有文本内容，实时 yield
+            if chunk.content:
+                yield chunk.content
+        
+        # 流结束，final_chunk 是完整的 AIMessage (Chunk)
+        response = final_chunk
         
         # 详细记录 LLM 原始响应
         if logger.level("DEBUG"):
@@ -206,11 +219,8 @@ def process_tool_calls(
                 messages.append(tool_message)  # 添加工具执行结果
         
         else:
-            logger.debug("No tool calls, streaming final response...")
-            # 没有工具调用，返回最终回复
-            content = response.content or ""
-            for char in content:
-                yield char
+            logger.debug("No tool calls, response already streamed.")
+            # 没有工具调用，且内容已经在流式循环中 yield 过了，无需再次 yield
             break
         
         # 安全检查：防止无限循环
