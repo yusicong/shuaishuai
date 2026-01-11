@@ -12,7 +12,13 @@ from __future__ import annotations
 import os
 from typing import Iterable, List, Optional
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
@@ -97,17 +103,32 @@ def to_langchain_messages(messages: Iterable[dict]) -> List[BaseMessage]:
     把前端常见的 {role, content} 消息结构转换为 LangChain 的 Message 对象。
 
     支持角色：
-    - system / user / assistant
+    - system / user / assistant / tool
     """
 
     result: List[BaseMessage] = []
     for m in messages or []:
         role = (m.get("role") or "").strip().lower()
         content = m.get("content") or ""
+        
         if role == "system":
             result.append(SystemMessage(content=content))
         elif role == "assistant":
-            result.append(AIMessage(content=content))
+            # 处理 assistant 可能包含的 tool_calls
+            tool_calls = m.get("tool_calls")
+            if tool_calls:
+                result.append(AIMessage(content=content, tool_calls=tool_calls))
+            else:
+                result.append(AIMessage(content=content))
+        elif role == "tool":
+            # 处理工具返回结果
+            result.append(
+                ToolMessage(
+                    content=content,
+                    tool_call_id=m.get("tool_call_id") or m.get("id"), # 兼容不同前端传参
+                    name=m.get("name"),
+                )
+            )
         else:
             result.append(HumanMessage(content=content))
     return result

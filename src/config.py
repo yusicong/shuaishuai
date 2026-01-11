@@ -48,11 +48,21 @@ class LangfuseSettings:
 
 
 @dataclass
+class SerperSettings:
+    api_key: Optional[str] = None
+    gl: str = "us"
+    hl: str = "en"
+    location: str = "United States"
+
+
+@dataclass
 class AppConfig:
     provider: str
+    log_level: str
     openai: OpenAISettings
     dashscope: "DashScopeSettings"
     langfuse: "LangfuseSettings"
+    serper: "SerperSettings"
 
 
 def load_yaml_config() -> dict:
@@ -89,8 +99,19 @@ def load_config() -> AppConfig:
     lf_public_key = os.getenv("LANGFUSE_PUBLIC_KEY") or langfuse_cfg.get("public_key")
     lf_host = os.getenv("LANGFUSE_HOST") or langfuse_cfg.get("host") or langfuse_cfg.get("base_url") or "https://cloud.langfuse.com"
 
+    # Serper
+    serper_cfg = (data.get("serper") or {})
+    serper_api_key = os.getenv("SERPER_API_KEY") or serper_cfg.get("api_key")
+    serper_gl = os.getenv("SERPER_GL") or serper_cfg.get("gl") or "us"
+    serper_hl = os.getenv("SERPER_HL") or serper_cfg.get("hl") or "en"
+    serper_location = os.getenv("SERPER_LOCATION") or serper_cfg.get("location") or "United States"
+    
+    # Log Level
+    log_level = os.getenv("LOG_LEVEL") or data.get("log_level") or "DEBUG"
+
     return AppConfig(
         provider=provider,
+        log_level=log_level,
         openai=OpenAISettings(
             api_key=api_key,
             model=model,
@@ -106,6 +127,12 @@ def load_config() -> AppConfig:
             secret_key=lf_secret_key,
             public_key=lf_public_key,
             host=lf_host,
+        ),
+        serper=SerperSettings(
+            api_key=serper_api_key,
+            gl=serper_gl,
+            hl=serper_hl,
+            location=serper_location,
         ),
     )
 
