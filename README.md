@@ -2,6 +2,23 @@
 
 本项目用于学习 Python、LangChain 和 LangGraph。
 
+## 快速开始：流式对话 API（SSE）
+
+本项目提供一个最小的 HTTP API，支持：
+- 非流式对话：一次性返回
+- 流式对话：SSE（服务端逐段推送模型输出）
+
+### 启动
+
+```bash
+pip install -r requirements.txt
+uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 文档
+
+- 前端 Vercel/Next.js 对接流式输出：[docs/vercel_流式对话对接.md](docs/vercel_%E6%B5%81%E5%BC%8F%E5%AF%B9%E8%AF%9D%E5%AF%B9%E6%8E%A5.md)
+
 ## 目录结构规划
 
 为了保持代码的整洁和可维护性，本项目采用以下目录结构：
@@ -25,6 +42,8 @@ lang-all/
 │   │   └── vector_store.py # 向量数据库服务
 │   ├── chains/             # LangChain 链的定义
 │   │   └── __init__.py
+│   ├── api/                # HTTP API（含 SSE 流式对话）
+│   │   └── app.py
 │   ├── graphs/             # LangGraph 图的定义
 │   │   └── __init__.py
 │   ├── tools/              # 自定义工具 (Tools)
