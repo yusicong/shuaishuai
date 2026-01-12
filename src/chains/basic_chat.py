@@ -137,17 +137,43 @@ def to_langchain_messages(messages: Iterable[dict]) -> List[BaseMessage]:
     return result
 
 
-def stream_text(chain, *, messages: List[BaseMessage], callbacks: Optional[list] = None) -> Iterable[str]:
+def stream_text(
+    chain, 
+    *, 
+    session_id: str, 
+    query: str, 
+    callbacks: Optional[list] = None
+) -> Iterable[str]:
     """
     同步流式输出：逐段 yield 文本增量。
-
-    说明：
-    - 这里保持“纯文本增量”的抽象，HTTP 层可以自由选择封装成 SSE、WebSocket 等；
-    - 后续若要切换到 async（支持 astream），可以新增 async 版本而不破坏现有接口。
+    
+    改为使用后端 Memory 管理历史：
+    1. 获取历史
+    2. 加入用户消息
+    3. 调用 Chain (stream)
+    4. 收集完整的 AI 消息并保存
     """
 
     config = {"callbacks": callbacks} if callbacks else {}
+    
+    # 1. 获取会话历史
+    history_store = get_session_history(session_id)
+    # 2. 将用户新问题加入历史
+    history_store.add_user_message(query)
+    
+    # 获取当前完整的消息列表
+    messages = history_store.messages.copy()
+    
+    # 用于收集完整的 AI 回复
+    full_response_content = []
+    
     for chunk in chain.stream({"messages": messages}, config=config):
         if chunk:
-            yield str(chunk)
+            text_chunk = str(chunk)
+            full_response_content.append(text_chunk)
+            yield text_chunk
+            
+    # 3. 保存 AI 回复到历史
+    if full_response_content:
+        history_store.add_ai_message("".join(full_response_content))
 

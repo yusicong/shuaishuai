@@ -25,7 +25,9 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    messages: List[ChatMessage] = Field(default_factory=list, description="对话消息列表（含历史）")
+    session_id: str = Field(..., description="会话唯一标识符")
+    query: str = Field(..., description="用户当前的输入问题")
+    messages: Optional[List[ChatMessage]] = Field(default=None, description="[已废弃] 历史消息列表，现由后端自动维护")
     system_prompt: Optional[str] = Field(default=None, description="可选：覆盖默认 system prompt")
     max_history_messages: int = Field(default=20, description="最大历史消息数量（保留最新的 N 条）")
     use_tools: bool = Field(default=True, description="是否启用工具调用（如网络搜索），默认开启")

@@ -75,12 +75,15 @@ def create_app() -> FastAPI:
         """
         SSE 流式输出协议（每帧为 JSON）：
         - {"type":"delta","content":"..."}：增量文本
+        - {"type":"tool_start", ...}：工具调用开始
+        - {"type":"tool_result", ...}：工具调用结果
         - {"type":"done"}：完成
         - {"type":"error","message":"..."}：错误
         
         参数：
-        - use_tools (Query/Body): 启用工具调用后，LLM 可以调用网络搜索工具获取实时信息
-        - max_history_messages (Body): 最大历史消息数量
+        - session_id: 会话ID
+        - query: 用户问题
+        - use_tools: 是否启用工具
         """
 
         cfg = load_config()
@@ -91,14 +94,8 @@ def create_app() -> FastAPI:
         # 确定 use_tools 的值：Query 参数优先，其次是 Body 参数
         final_use_tools = use_tools_query if use_tools_query is not None else req.use_tools
         
-        logger.info(f"Received chat_stream request. use_tools={final_use_tools}, "
-                    f"msg_count={len(req.messages)}, max_history={req.max_history_messages}")
+        logger.info(f"Received chat_stream request. session_id={req.session_id}, query={req.query[:50]}..., use_tools={final_use_tools}")
         
-        # 详细记录请求消息内容
-        if logger.level("DEBUG"):
-            for i, msg in enumerate(req.messages):
-                logger.debug(f"Request Msg[{i}] ({msg.role}): {msg.content[:200]}..." if len(msg.content) > 200 else f"Request Msg[{i}] ({msg.role}): {msg.content}")
-
         if final_use_tools:
             logger.debug("Creating tool calling chain")
             chain = create_tool_calling_chain(cfg, system_prompt=req.system_prompt)
@@ -109,34 +106,20 @@ def create_app() -> FastAPI:
             stream_func = stream_text
         
         callbacks = build_callbacks(cfg)
-        
-        # 处理历史消息截断
-        messages_to_process = req.messages
-        if req.max_history_messages > 0 and len(messages_to_process) > req.max_history_messages:
-            logger.debug(f"Truncating history from {len(messages_to_process)} to {req.max_history_messages}")
-            # 保留最新的 N 条消息，但通常建议保留 System Message (如果有)
-            # 这里简单实现：直接截取最后 N 条
-            # 优化：如果第一条是 system，尽量保留
-            if messages_to_process[0].role == "system":
-                system_msg = messages_to_process[0]
-                history = messages_to_process[-(req.max_history_messages - 1):]
-                # 避免重复
-                if history[0] == system_msg: 
-                    messages_to_process = history
-                else:
-                    messages_to_process = [system_msg] + history
-            else:
-                messages_to_process = messages_to_process[-req.max_history_messages:]
-
-        lc_messages = to_langchain_messages([m.model_dump() for m in messages_to_process])
 
         def gen() -> Iterable[str]:
             request_id = f"req_{int(time.time() * 1000)}"
             logger.debug(f"Starting stream for {request_id}")
             yield sse_encode({"type": "meta", "request_id": request_id}, event="message")
             try:
-                for delta in stream_func(chain, messages=lc_messages, callbacks=callbacks):
-                    yield sse_encode({"type": "delta", "content": delta}, event="message")
+                # 调用流式函数，传入 session_id 和 query
+                for chunk in stream_func(chain, session_id=req.session_id, query=req.query, callbacks=callbacks):
+                    if isinstance(chunk, str):
+                        yield sse_encode({"type": "delta", "content": chunk}, event="message")
+                    elif isinstance(chunk, dict):
+                        # 直接透传工具事件 (tool_start, tool_result)
+                        yield sse_encode(chunk, event="message")
+                
                 yield sse_encode({"type": "done"}, event="message")
                 logger.info(f"Stream finished for {request_id}")
             except Exception as e:

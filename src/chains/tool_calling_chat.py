@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import json
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, List, Optional, Union, Dict, Any
 
 from langchain_core.messages import (
     AIMessage,
@@ -34,6 +34,7 @@ from langchain_openai import ChatOpenAI
 from langfuse.langchain import CallbackHandler
 
 from src.config import AppConfig
+from src.core.memory import get_session_history
 from src.tools import create_serper_search_tool, create_current_time_tool
 from src.utils.logger import logger
 
@@ -115,30 +116,30 @@ def create_tool_calling_chain(cfg: AppConfig, system_prompt: Optional[str] = Non
 
 def process_tool_calls(
     chain: Runnable,
-    messages: List[BaseMessage],
+    session_id: str,
+    query: str,
     callbacks: list = None,
-    max_iterations: int = 3
-) -> Iterable[str]:
+    max_iterations: int = 10
+) -> Iterable[Union[str, Dict[str, Any]]]:
     """
     处理工具调用迭代，生成最终回复的流式输出。
-
-    算法：
-    1. 将当前消息传入链，得到 AIMessage
-    2. 检查是否有 tool_calls
-    3. 如果有，执行每个工具调用，将结果添加为 ToolMessage
-    4. 将新的 ToolMessage 添加到消息列表，重复步骤1
-    5. 如果没有 tool_calls，则返回 AIMessage 的内容
-
-    参数：
-        chain: 调用工具链
-        messages: 当前消息历史
-        callbacks: 回调函数列表
-        max_iterations: 最大迭代次数，防止无限循环
-
-    返回：
-        生成器，逐段产出最终回复文本
+    
+    改为使用后端 Memory 管理历史：
+    1. 加载当前 Session 的历史消息
+    2. 将新用户问题加入历史
+    3. 执行工具调用循环
+    4. 将每一步的 AI 消息和工具结果手动保存到历史
     """
     config = {"callbacks": callbacks} if callbacks else {}
+    
+    # 1. 获取会话历史
+    history_store = get_session_history(session_id)
+    # 将用户新问题加入历史
+    history_store.add_user_message(query)
+    
+    # 获取完整的消息列表（用于传给 LLM）
+    # 注意：这里我们取出的就是 BaseMessage 列表
+    messages = history_store.messages.copy()
     
     # 提前加载配置，避免循环中重复加载
     from src.config import load_config
@@ -195,6 +196,13 @@ def process_tool_calls(
                 
                 logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
                 
+                # Yield 工具开始事件
+                yield {
+                    "type": "tool_start",
+                    "tool": tool_name,
+                    "input": tool_args
+                }
+                
                 # 查找工具实例
                 if tool_name == "serper_search":
                     tool_result = search_tool._run(**tool_args)
@@ -209,6 +217,13 @@ def process_tool_calls(
                 else:
                     logger.debug(f"Tool result: {str(tool_result)[:200]}...")
                 
+                # Yield 工具结果事件
+                yield {
+                    "type": "tool_result",
+                    "tool": tool_name,
+                    "output": tool_result
+                }
+
                 # 创建 ToolMessage
                 tool_message = ToolMessage(
                     content=json.dumps(tool_result, ensure_ascii=False),
@@ -243,13 +258,12 @@ def to_langchain_messages(messages: Iterable[dict]) -> List[BaseMessage]:
 
 def stream_tool_calling_text(
     chain: Runnable,
-    messages: List[BaseMessage],
+    session_id: str,
+    query: str,
     callbacks: list = None,
-    max_iterations: int = 3
-) -> Iterable[str]:
+    max_iterations: int = 10
+) -> Iterable[Union[str, Dict[str, Any]]]:
     """
     流式输出工具调用链的最终回复。
-
-    这是为了与基础链的 stream_text 函数保持接口一致。
     """
-    yield from process_tool_calls(chain, messages, callbacks, max_iterations)
+    yield from process_tool_calls(chain, session_id, query, callbacks, max_iterations)
