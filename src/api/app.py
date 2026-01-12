@@ -67,20 +67,6 @@ def create_app() -> FastAPI:
     def healthz():
         return {"ok": True}
 
-    @app.post("/api/chat", response_model=ChatResponse)
-    def chat(req: ChatRequest):
-        # 支持热加载配置 暂定每次都加载配置
-        cfg = load_config()
-        errors = validate_config(cfg)
-        if errors:
-            return JSONResponse(status_code=400, content={"errors": errors})
-
-        chain = build_chat_chain(cfg, system_prompt=req.system_prompt)
-        callbacks = build_callbacks(cfg)
-        lc_messages = to_langchain_messages([m.model_dump() for m in req.messages])
-        reply = chain.invoke({"messages": lc_messages}, config={"callbacks": callbacks} if callbacks else {})
-        return ChatResponse(reply=str(reply))
-
     @app.post("/api/chat/stream")
     def chat_stream(
         req: ChatRequest,

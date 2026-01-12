@@ -176,8 +176,24 @@ class SerperSearchTool(BaseTool):
                 "link": item.get("link"),
                 "snippet": item.get("snippet"),
             })
+        
+        # 评估搜索结果
         if organic_results:
-            simplified["organic_results"] = organic_results
+            try:
+                from src.tools.search_evaluator import evaluate_search_results
+                evaluated_results = evaluate_search_results(
+                    query=simplified["query"],
+                    results=organic_results
+                )
+                simplified["organic_results"] = evaluated_results
+                logger.debug(f"搜索结果评估完成，最高分: {evaluated_results[0]['overall_score']:.2f} "
+                           f"({evaluated_results[0]['title'][:30]}...)")
+            except ImportError as e:
+                logger.warning(f"评估器导入失败，跳过评估: {e}")
+                simplified["organic_results"] = organic_results
+            except Exception as e:
+                logger.error(f"搜索结果评估异常: {e}")
+                simplified["organic_results"] = organic_results
 
         # 提取答案框（如果有）
         if "answerBox" in result:

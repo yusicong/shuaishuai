@@ -10,10 +10,13 @@
 
 from src.tools.serper_search import SerperSearchTool, create_serper_search_tool
 from src.tools.current_time import CurrentTimeTool, create_current_time_tool
+from src.tools.search_evaluator import SearchResultEvaluator, evaluate_search_results
 
 __all__ = [
     "SerperSearchTool",
     "create_serper_search_tool",
     "CurrentTimeTool",
     "create_current_time_tool",
+    "SearchResultEvaluator",
+    "evaluate_search_results",
 ]
