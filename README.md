@@ -1,112 +1,49 @@
-# LangChain + LangGraph 学习项目
 
-本项目用于学习 Python、LangChain 和 LangGraph。
+## 实现了什么
 
-## 快速开始：流式对话 API（SSE）
+### 1. 流式对话 API (SSE)
+为了方便对接类似 ChatGPT 的前端体验，我实现了一个基于 Server-Sent Events (SSE) 的接口。相比 WebSocket，它更轻量，也更适合 LLM 这种“逐字吐出”的场景。
 
-本项目提供一个最小的 HTTP API，支持：
-- 非流式对话：一次性返回
-- 流式对话：SSE（服务端逐段推送模型输出）
+- **普通对话**: `/api/chat` (一次性返回)
+- **流式对话**: `/api/chat/stream` (实时推送 Token)
 
-### 启动
+如果你需要对接前端（比如 Vercel AI SDK），可以参考我写的这篇笔记：[docs/vercel_流式对话对接.md](docs/vercel_流式对话对接.md)
+
+### 2. 向量数据库集成
+为了使用 RAG，接入了 **ChromaDB**。
+- 代码在 `src/core/vector_store.py` 和 `src/utils/vector_utils.py`。
+- 目前支持简单的文本存入和相似度搜索，数据会持久化保存在 `data/vector_db` 下。
+
+## 怎么跑起来
+
+环境配置比较简单，我尽量保持了依赖的精简。
 
 ```bash
+# 1. 安装依赖
 pip install -r requirements.txt
+
+# 2. 启动服务 (默认 8000 端口)
 uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 文档
+## 项目结构
 
-- 前端 Vercel/Next.js 对接流式输出：[docs/vercel_流式对话对接.md](docs/vercel_%E6%B5%81%E5%BC%8F%E5%AF%B9%E8%AF%9D%E5%AF%B9%E6%8E%A5.md)
-
-## 目录结构规划
-
-为了保持代码的整洁和可维护性，本项目采用以下目录结构：
+为了避免代码写着写着就乱了（毕竟 Python 比较灵活），我参考了一些工程化规范，整理了目前的目录结构：
 
 ```text
 lang-all/
-├── config/                 # 存放配置文件
-│   └── settings.yaml       # (可选) 项目配置，如模型名称、API参数等
-├── data/                   # 存放数据文件
-│   ├── raw/                # 原始数据
-│   ├── processed/          # 处理后的数据
-│   └── vector_db/          # 向量数据库持久化目录
-├── docs/                   # 项目文档
-├── notebooks/              # Jupyter Notebooks，用于实验和演示
-│   ├── 01_langchain_basics.ipynb
-│   └── 02_langgraph_intro.ipynb
-├── src/                    # 源代码目录
-│   ├── __init__.py
-│   ├── core/               # 核心逻辑
-│   │   ├── config.py       # 配置加载逻辑
-│   │   └── vector_store.py # 向量数据库服务
-│   ├── chains/             # LangChain 链的定义
-│   │   └── __init__.py
-│   ├── api/                # HTTP API（含 SSE 流式对话）
-│   │   └── app.py
-│   ├── graphs/             # LangGraph 图的定义
-│   │   └── __init__.py
-│   ├── tools/              # 自定义工具 (Tools)
-│   │   └── __init__.py
-│   └── utils/              # 通用工具函数
-│       ├── __init__.py
-│       └── vector_utils.py # 向量数据库工具类
+├── config/                 # 配置相关
+├── data/                   # 数据存储 (向量库数据在这里)
+├── docs/                   # 学习过程中的文档记录
+├── notebooks/              # 用于快速实验的 Jupyter Notebooks
+├── src/                    # 核心代码
+│   ├── api/                # FastAPI 接口层
+│   ├── chains/             # LangChain 的 Chain 定义
+│   ├── core/               # 核心组件 (配置、数据库连接)
+│   ├── graphs/             # LangGraph 图定义 (正在研究中)
+│   └── utils/              # 工具类
 ├── tests/                  # 测试代码
-│   ├── __init__.py
-│   └── test_main.py
-├── .env                    # 环境变量 (包含 API Keys，不要提交到 Git)
-├── .env.example            # 环境变量示例 (用于分享)
-├── .gitignore              # Git 忽略文件配置
-├── README.md               # 项目说明文档
-└── requirements.txt        # 项目依赖包列表
+└── .env                    # 环境变量 (API Key 放这里)
 ```
 
-## 目录说明
 
-- **config/**: 用于存放项目的配置文件，将配置与代码分离。
-- **data/**: 存放项目运行所需的数据文件。
-- **docs/**: 存放更详细的项目文档或笔记。
-- **notebooks/**: 这是一个非常重要的目录，用于存放 Jupyter Notebook (`.ipynb`) 文件。作为初学者，可以在这里进行代码实验、调试和快速验证想法。
-- **src/**: 所有的源代码都应该放在这里。
-    - **core/**: 存放核心配置和基础类。
-    - **chains/**: 如果你使用 LangChain 构建特定的链（Chains），将它们定义在这里。
-    - **graphs/**: LangGraph 的核心是图（Graph），将你的状态图定义放在这里。
-    - **tools/**: 如果你自定义了供 Agent 使用的工具，放在这里。
-    - **utils/**: 存放一些通用的辅助函数。
-- **tests/**: 编写测试用例，确保代码的正确性。
-- **.env**: 存放敏感信息，如 `OPENAI_API_KEY`。
-- **requirements.txt**: 记录项目安装的 Python 包。
-
-## 向量数据库 (ChromaDB)
-
-本项目集成了 ChromaDB 作为向量数据库，用于检索增强生成 (RAG) 等场景。
-
-### 初始化
-
-在应用启动时，需要调用 `init_chroma_service()` 来初始化向量数据库服务：
-
-```python
-from src.core.vector_store import init_chroma_service
-
-# 初始化向量数据库服务
-init_chroma_service(persist_directory="./data/vector_db", embedding_model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-```
-
-### 使用工具类
-
-项目提供了便捷的工具类 `VectorDBUtil` 来操作向量数据库：
-
-```python
-from src.utils.vector_utils import VectorDBUtil, add_texts, similarity_search
-
-# 方法一：使用工具类实例
-util = VectorDBUtil(collection_name="my_docs")
-doc_ids = util.add_texts(["文档1内容", "文档2内容"], [{"source": "file1"}, {"source": "file2"}])
-results = util.similarity_search("查询文本", k=2)
-
-# 方法二：使用便捷函数
-doc_ids = add_texts(["文档1内容", "文档2内容"], [{"source": "file1"}, {"source": "file2"}], collection_name="my_docs")
-results = similarity_search("查询文本", k=2, collection_name="my_docs")
-```
-
-向量数据库会自动在 `./data/vector_db` 目录下进行持久化存储。

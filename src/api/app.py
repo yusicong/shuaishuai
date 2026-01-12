@@ -40,11 +40,7 @@ from src.utils.logger import logger
 
 def _parse_cors_origins(value: Optional[str]) -> list[str]:
     """
-    解析 CORS_ORIGINS 环境变量。
-
-    允许写法：
-    - "*"（允许任意源，学习阶段最省事；正式环境建议收紧）
-    - "https://a.com,https://b.com"
+    解析 CORS_ORIGINS 环境变量。 （允许任意源）
     """
 
     if not value:
@@ -73,6 +69,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/chat", response_model=ChatResponse)
     def chat(req: ChatRequest):
+        # 支持热加载配置 暂定每次都加载配置
         cfg = load_config()
         errors = validate_config(cfg)
         if errors:
@@ -153,8 +150,6 @@ def create_app() -> FastAPI:
             yield sse_encode({"type": "meta", "request_id": request_id}, event="message")
             try:
                 for delta in stream_func(chain, messages=lc_messages, callbacks=callbacks):
-                    if logger.level("DEBUG"):
-                        logger.debug(f"Stream chunk: {delta[:50]}..." if len(delta) > 50 else f"Stream chunk: {delta}")
                     yield sse_encode({"type": "delta", "content": delta}, event="message")
                 yield sse_encode({"type": "done"}, event="message")
                 logger.info(f"Stream finished for {request_id}")

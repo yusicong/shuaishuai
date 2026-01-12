@@ -25,6 +25,7 @@ from langchain_openai import ChatOpenAI
 from langfuse.langchain import CallbackHandler
 
 from src.config import AppConfig
+import logging
 
 
 def build_callbacks(cfg: AppConfig) -> list:
@@ -42,6 +43,8 @@ def build_callbacks(cfg: AppConfig) -> list:
     os.environ["LANGFUSE_SECRET_KEY"] = cfg.langfuse.secret_key
     os.environ["LANGFUSE_PUBLIC_KEY"] = cfg.langfuse.public_key
     os.environ["LANGFUSE_HOST"] = cfg.langfuse.host
+    logger = logging.getLogger(__name__)
+    logger.info("Langfuse 回调已启用，将链路追踪发送到 %s", cfg.langfuse.host)
     return [CallbackHandler()]
 
 
