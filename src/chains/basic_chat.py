@@ -26,6 +26,7 @@ from langfuse.langchain import CallbackHandler
 
 from src.config import AppConfig
 import logging
+from langchain_community.chat_message_histories import ChatMessageHistory
 
 
 def build_callbacks(cfg: AppConfig) -> list:
@@ -157,7 +158,8 @@ def stream_text(
     config = {"callbacks": callbacks} if callbacks else {}
     
     # 1. 获取会话历史
-    history_store = get_session_history(session_id)
+    # 1. 获取会话历史
+    history_store = ChatMessageHistory()  # 临时使用内存存储，后续可接入 Redis 等持久化
     # 2. 将用户新问题加入历史
     history_store.add_user_message(query)
     
