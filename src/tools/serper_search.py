@@ -99,9 +99,9 @@ class SerperSearchTool(BaseTool):
         Returns:
             包含搜索结果的结构化字典
         """
-        logger.debug(f"Executing Serper search. Query: {query}, GL: {self._gl}, HL: {self._hl}")
+        logger.debug(f"执行 Serper 搜索。查询: {query}, 地区: {self._gl}, 语言: {self._hl}")
         if logger.level("DEBUG"):
-             logger.debug(f"Serper API payload: {json.dumps({'q': query, 'num': num_results, 'gl': self._gl, 'hl': self._hl, 'location': self._location}, ensure_ascii=False)}")
+             logger.debug(f"Serper API 请求体: {json.dumps({'q': query, 'num': num_results, 'gl': self._gl, 'hl': self._hl, 'location': self._location}, ensure_ascii=False)}")
         try:
             payload = json.dumps({
                 "q": query,
@@ -121,27 +121,27 @@ class SerperSearchTool(BaseTool):
             response.raise_for_status()
 
             result = response.json()
-            logger.debug(f"Serper API response status: {response.status_code}")
+            logger.debug(f"Serper API 响应状态码: {response.status_code}")
             
             # 详细记录 API 响应内容
             if logger.level("DEBUG"):
-                logger.debug(f"Serper API raw response: {json.dumps(result, ensure_ascii=False)[:500]}..." if len(json.dumps(result)) > 500 else f"Serper API raw response: {json.dumps(result, ensure_ascii=False)}")
+                logger.debug(f"Serper API 原始响应: {json.dumps(result, ensure_ascii=False)[:500]}..." if len(json.dumps(result)) > 500 else f"Serper API 原始响应: {json.dumps(result, ensure_ascii=False)}")
 
             # 简化结果，便于 LLM 理解
             simplified = self._simplify_result(result)
-            logger.debug(f"Simplified results count: {len(simplified.get('organic_results', []))}")
+            logger.debug(f"简化后的结果数量: {len(simplified.get('organic_results', []))}")
             return simplified
 
         except requests.exceptions.Timeout:
-            logger.error("Serper API timeout")
+            logger.error("Serper API 请求超时")
             return {"error": "搜索请求超时，请稍后重试"}
         except requests.exceptions.RequestException as e:
-            logger.error(f"Serper API error: {e}")
+            logger.error(f"Serper API 错误: {e}")
             if hasattr(e, 'response') and e.response is not None:
-                 logger.error(f"API Response: {e.response.text}")
+                 logger.error(f"API 响应: {e.response.text}")
             return {"error": f"网络请求失败: {str(e)}"}
         except json.JSONDecodeError:
-            logger.error("Serper API returned invalid JSON")
+            logger.error("Serper API 返回无效 JSON")
             return {"error": "搜索结果解析失败"}
 
     def _simplify_result(self, result: Dict[str, Any]) -> Dict[str, Any]:

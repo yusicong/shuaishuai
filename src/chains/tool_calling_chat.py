@@ -100,7 +100,7 @@ def create_tool_calling_chain(cfg: AppConfig, system_prompt: Optional[str] = Non
     else:
         system_prompt = base_system_prompt
     
-    logger.debug(f"Tool calling chain system prompt: {system_prompt[:100]}...")
+    logger.debug(f"工具调用链系统提示: {system_prompt[:100]}...")
 
     # 构建提示模板
     prompt = ChatPromptTemplate.from_messages([
@@ -154,13 +154,13 @@ def process_tool_calls(
     
     for iteration in range(max_iterations):
         # 调用链获取响应
-        logger.debug(f"Iteration {iteration + 1}: Invoking LLM (streaming)...")
+        logger.debug(f"迭代 {iteration + 1}: 调用 LLM（流式）...")
         
         # 详细记录输入消息
         if logger.level("DEBUG"):
             for i, msg in enumerate(messages):
                 content_preview = str(msg.content)[:100] + "..." if len(str(msg.content)) > 100 else str(msg.content)
-                logger.debug(f"Chain Input Msg[{i}] ({type(msg).__name__}): {content_preview}")
+                logger.debug(f"链输入消息[{i}] ({type(msg).__name__}): {content_preview}")
 
         # 使用 chain.stream 替代 chain.invoke
         final_chunk = None
@@ -182,19 +182,19 @@ def process_tool_calls(
         
         # 详细记录 LLM 原始响应
         if logger.level("DEBUG"):
-            logger.debug(f"LLM Response Content: {response.content}")
+            logger.debug(f"LLM 响应内容: {response.content}")
             if response.tool_calls:
-                logger.debug(f"LLM Response Tool Calls: {response.tool_calls}")
+                logger.debug(f"LLM 响应工具调用: {response.tool_calls}")
         
         # 检查是否有工具调用
         if response.tool_calls:
-            logger.info(f"Tool calls detected: {len(response.tool_calls)}")
+            logger.info(f"检测到工具调用: {len(response.tool_calls)}")
             # 执行每个工具调用
             for tool_call in response.tool_calls:
                 tool_name = tool_call["name"]
                 tool_args = tool_call["args"]
                 
-                logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+                logger.info(f"执行工具: {tool_name} 参数: {tool_args}")
                 
                 # Yield 工具开始事件
                 yield {
@@ -213,9 +213,9 @@ def process_tool_calls(
                 
                 # 详细记录工具执行结果
                 if logger.level("DEBUG"):
-                    logger.debug(f"Tool result (full): {json.dumps(tool_result, ensure_ascii=False)}")
+                    logger.debug(f"工具结果（完整）: {json.dumps(tool_result, ensure_ascii=False)}")
                 else:
-                    logger.debug(f"Tool result: {str(tool_result)[:200]}...")
+                    logger.debug(f"工具结果: {str(tool_result)[:200]}...")
                 
                 # Yield 工具结果事件
                 yield {
@@ -234,13 +234,13 @@ def process_tool_calls(
                 messages.append(tool_message)  # 添加工具执行结果
         
         else:
-            logger.debug("No tool calls, response already streamed.")
+            logger.debug("无工具调用，响应已流式输出。")
             # 没有工具调用，且内容已经在流式循环中 yield 过了，无需再次 yield
             break
         
         # 安全检查：防止无限循环
         if iteration >= max_iterations - 1:
-            logger.warning("Max iterations reached, stopping.")
+            logger.warning("达到最大迭代次数，停止。")
             yield "⚠️ 达到最大工具调用次数，停止迭代。"
             break
 

@@ -94,14 +94,14 @@ def create_app() -> FastAPI:
         # 确定 use_tools 的值：Query 参数优先，其次是 Body 参数
         final_use_tools = use_tools_query if use_tools_query is not None else req.use_tools
         
-        logger.info(f"Received chat_stream request. session_id={req.session_id}, query={req.query[:50]}..., use_tools={final_use_tools}")
+        logger.info(f"收到流式对话请求。session_id={req.session_id}, 查询={req.query[:50]}..., use_tools={final_use_tools}")
         
         if final_use_tools:
-            logger.debug("Creating tool calling chain")
+            logger.debug("创建工具调用链")
             chain = create_tool_calling_chain(cfg, system_prompt=req.system_prompt)
             stream_func = stream_tool_calling_text
         else:
-            logger.debug("Creating basic chat chain")
+            logger.debug("创建基础对话链")
             chain = build_chat_chain(cfg, system_prompt=req.system_prompt)
             stream_func = stream_text
         
@@ -109,7 +109,7 @@ def create_app() -> FastAPI:
 
         def gen() -> Iterable[str]:
             request_id = f"req_{int(time.time() * 1000)}"
-            logger.debug(f"Starting stream for {request_id}")
+            logger.debug(f"开始流式输出：{request_id}")
             yield sse_encode({"type": "meta", "request_id": request_id}, event="message")
             try:
                 # 调用流式函数，传入 session_id 和 query
@@ -121,9 +121,9 @@ def create_app() -> FastAPI:
                         yield sse_encode(chunk, event="message")
                 
                 yield sse_encode({"type": "done"}, event="message")
-                logger.info(f"Stream finished for {request_id}")
+                logger.info(f"流式输出完成：{request_id}")
             except Exception as e:
-                logger.error(f"Stream error for {request_id}: {e}")
+                logger.error(f"流式输出错误：{request_id}: {e}")
                 yield sse_encode({"type": "error", "message": str(e)}, event="message")
 
         return StreamingResponse(gen(), media_type="text/event-stream")
