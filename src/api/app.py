@@ -16,14 +16,19 @@ from __future__ import annotations
 
 import os
 import time
+import shutil
+import uuid
+import asyncio
+from pathlib import Path
 from typing import Iterable, Optional
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.schemas import ChatRequest, ChatResponse
 from src.api.sse import sse_encode
+from src.api.file_processing import file_processor_stream
 from src.chains.basic_chat import (
     build_callbacks,
     build_chat_chain,
@@ -126,6 +131,66 @@ def create_app() -> FastAPI:
                 logger.error(f"流式输出错误：{request_id}: {e}")
                 yield sse_encode({"type": "error", "message": str(e)}, event="message")
 
+        return StreamingResponse(gen(), media_type="text/event-stream")
+
+    @app.post("/api/upload")
+    async def upload_file(file: UploadFile = File(...)):
+        """
+        文件上传接口。
+        接收文件并保存到临时目录，返回 file_id 供后续流式处理使用。
+        """
+        try:
+            # 确保临时目录存在
+            temp_dir = Path("temp_uploads")
+            temp_dir.mkdir(exist_ok=True)
+            
+            file_id = str(uuid.uuid4())
+            # 保留原始扩展名
+            file_ext = os.path.splitext(file.filename)[1] if file.filename else ""
+            temp_path = temp_dir / f"{file_id}{file_ext}"
+            
+            # 写入临时文件
+            with open(temp_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            
+            # 简单的内存缓存，实际生产建议用 Redis
+            # 注意：app.state 可以用来存储全局状态
+            if not hasattr(app.state, "upload_cache"):
+                app.state.upload_cache = {}
+            
+            app.state.upload_cache[file_id] = {
+                "path": str(temp_path),
+                "filename": file.filename
+            }
+            
+            logger.info(f"文件上传成功: {file_id} ({file.filename})")
+            return {"file_id": file_id, "filename": file.filename}
+        except Exception as e:
+            logger.error(f"文件上传失败: {e}")
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    @app.get("/api/process/{file_id}/stream")
+    async def process_stream(file_id: str):
+        """
+        文件处理流式接口 (SSE)。
+        根据 file_id 获取文件并执行分析流程。
+        """
+        # 获取缓存信息
+        cache = getattr(app.state, "upload_cache", {})
+        if file_id not in cache:
+            return JSONResponse(status_code=404, content={"error": "File not found or expired"})
+            
+        file_info = cache.pop(file_id) # 取出后即从缓存移除
+        
+        async def gen():
+            yield sse_encode({"step": "connected", "message": "连接成功，准备处理...", "progress": 0}, event="message")
+            try:
+                async for event in file_processor_stream(file_info["path"], file_info["filename"]):
+                    yield sse_encode(event, event="message")
+            except Exception as e:
+                logger.error(f"SSE处理异常: {e}")
+                yield sse_encode({"step": "error", "message": f"处理异常: {e}", "progress": 0}, event="message")
+                
         return StreamingResponse(gen(), media_type="text/event-stream")
 
     return app

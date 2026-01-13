@@ -23,3 +23,9 @@ pytest>=8.0.0
 # Web API（用于流式对话 SSE）
 fastapi>=0.110.0
 uvicorn>=0.27.0
+python-multipart>=0.0.9
+
+# 文件处理与图像分析
+pdf2image>=1.17.0
+Pillow>=10.0.0
+numpy>=1.26.0
